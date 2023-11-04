@@ -1,0 +1,91 @@
+---
+title: "Introduccion Risk of AIV in Cuba during the last ten years"
+author: "Beatriz Delgqdo Hernandez"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+  markdown:
+    references: "references"
+      location: document
+    prefix: "mydoc"
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+```
+MATERIALS AND METHODS
+```{r library}
+library(auk)
+library(rgbif)
+library(dplyr)
+library(sf)
+library(ggplot2)
+library(gridExtra)
+library(lubridate)
+library(readr)
+library(tidyverse)
+library(spdep)
+sf_use_s2(FALSE)
+```
+DESCRIPTION OF STUDY AREA
+```{r cubalayer}
+map_proj <- st_crs(4326)
+
+cuba_nac <- st_read("gadm41_CUB_0.shp") %>% 
+  st_simplify(preserveTopology = FALSE, dTolerance = 0.01) %>% 
+  st_transform(crs = 26717) #%>% 
+  # st_geometry()
+cuba_prov <- st_read("gadm41_CUB_1.shp") %>% 
+  st_simplify(preserveTopology = FALSE, dTolerance = 0.01) #%>% 
+  # st_transform(crs = map_proj) %>% 
+  # st_geometry()
+cuba_mun <- st_read("gadm41_CUB_2.shp") %>% 
+  st_simplify(preserveTopology = FALSE, dTolerance = 0.01) %>% 
+  st_transform(crs = map_proj) 
+```
+
+
+
+An equal area grid over Cuba was created to account for the spatial bias (Strimas-Macke et. al., 2023)
+#Creating grid cell, hexagonal of 10km
+
+```{r grid}
+#degree 1 = 111km; 0.1 = 11.1km; 0.01 = 1.11km; 0.001 = 111m
+# creating hexagonal grid cell of 10km
+# sqrt(2*cell_area/sqrt(3))#area of an hexagon
+cell_area <- units::as_units(100, "km^2")
+grid_size <- sqrt(2*cell_area/3*sqrt(3))
+cub_hex <- st_make_grid(cuba_nac, cellsize = cell_area, 
+             crs = st_crs(cuba_nac), square=FALSE,
+             flat_topped = TRUE)
+cub_hex <-cub_hex %>% st_as_sf() %>% 
+  # st_transform(crs = st_crs(ebird) ) %>% 
+  mutate(grid_id=1:length(lengths(cub_hex)))
+
+cub_hex$area_pol <- as.numeric(st_area(cub_hex))/(1000*1000)# 1km x 1km 
+```
+
+```{r}
+points_inside <- lengths(st_intersects(cub_hex, ebird))
+cub_ebird<-  st_join(cub_hex, ebird)
+# cub_ebird<-merge(cub_ebird, cub_hex, by = c("ID", "area_pol")) %>% st_as_sf()
+study_year <- c(min(ebird$year):max(ebird$year))
+cubbird <- cub_ebird %>% filter(year != is.na(year))
+cub_ebird_point<- ebird %>% group_by(year) %>% 
+  st_join(y=cub_hex)
+
+plot(st_geometry(cuba_nac))
+plot(st_geometry(cub_ebird), add=TRUE)
+
+st_write(cub_ebird,  "cub_bird_grid10KM_meters.csv", layer_options = "GEOMETRY=AS_WKT")
+st_write(cub_ebird,"cub_bird_10km_meters.shp")
+st_write(cub_ebird_point,"cub_bird_poin_10km_meters.shp")
+
+
+```
+The intersection between the grid and the occurence dataset was calculated, keeping the geometry of the grid as an attemp to reduce the Spatial precision (Strimas-Macke et. al., 2023)
+
+
+
+
+

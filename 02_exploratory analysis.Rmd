@@ -1,0 +1,177 @@
+---
+title: "Introduction Risk of AIV in Cuba during the last ten years"
+author: "Beatriz Delgado Hernandez"
+output: word_document
+date: "Sys"
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+
+```
+MATERIALS AND METHODS
+```{r library}
+library(auk)
+library(rgbif)
+library(dplyr)
+library(sf)
+library(ggplot2)
+library(gridExtra)
+library(lubridate)
+library(readr)
+library(tidyverse)
+library(DescTools)
+sf_use_s2(FALSE)
+```
+DESCRIPTION OF STUDY AREA
+```{r cubalayer}
+map_proj <- st_crs(3795)
+
+cuba_nac <- st_read("cuba.shp") %>% 
+  st_simplify(preserveTopology = FALSE, dTolerance = 0.01) 
+cuba_prov <- st_read("cuba_prov.shp") %>% 
+  st_simplify(preserveTopology = FALSE, dTolerance = 0.01) 
+cuba_mun <- st_read("cuba_muni.shp") %>% 
+  st_simplify(preserveTopology = FALSE, dTolerance = 0.01) 
+```
+
+```{r loadingdb}
+# 
+# KEEPT 573607 OF 647660 from ebird_data.csv using qgis, cayos localities were eliminated because no farm points are located them. EPSG:3795. dataset exported to ebird_modif_meters.shp (3gb)
+ebird <- st_read("ebird_modif_meters.shp") %>% 
+  st_simplify(preserveTopology = FALSE, dTolerance = 0.01) %>% 
+  st_transform(crs = map_proj)
+```
+
+```{r selecting}
+
+ebird<- ebird %>% dplyr::select(scientific, iba_code, observer_i,  protocol_t,
+                                observat_1,year, day_of_yea, locality, locality_i, longitude, latitude, species_ob, observatio)
+
+ebird<-ebird %>% rename(scient_name="scientific",
+                 date_obs = "observat_1",
+                 count_ind = "observatio",
+                 cumday_year = "day_of_yea") %>% 
+  mutate(date_obs=as_date(date_obs)) %>% 
+  mutate(month_year = month(x=date_obs, label=FALSE),
+         weeks_year = epiweek(x=date_obs),#epidemiological week starting on Sunday
+         .before = cumday_year) %>% mutate(species_ob=as.logical(species_ob))
+glimpse(ebird)
+```
+
+##Exploratory analysis
+###Plotting both two dataset in cuba map
+```{r}
+plot(st_geometry(cuba_mun))
+plot(st_geometry(ebird), col="blue", add=TRUE)
+# plot(st_geometry(gbif), col="red", add=TRUE)
+
+```
+###Descriptive statistics
+```{r SUMMARIZING}
+# the 2021 AND 2019 YEARS HAD THE HIGHER VARIABILITY, THIS COULD BE BECAUSE THE LONG NUMBER OF INDIVIDUALS REPORTED
+knitr::kable(descrip_analysis <- ebird %>% st_drop_geometry()%>% group_by(year) %>% select(count_ind) %>% 
+  reframe(n = n(), 
+            mean_abund = mean(count_ind, na.rm = TRUE), 
+            desv_st = sd(count_ind, na.rm = TRUE),
+            stderr = desv_st/sqrt(n),
+            LCL = mean_abund - qt(1 - (0.05 / 2), n - 1) * stderr,
+            UCL = mean_abund + qt(1 - (0.05 / 2), n - 1) * stderr,
+            median_abund = median(count_ind, na.rm = TRUE),
+            min_abund = min(count_ind, na.rm = TRUE), 
+            max_abund = max(count_ind, na.rm = TRUE),
+            IQR_abund = IQR(count_ind, na.rm = TRUE),
+            LCLmed = MedianCI(count_ind, na.rm=TRUE)[2],
+            UCLmed = MedianCI(count_ind, na.rm=TRUE)[3]
+            ))
+ebird<-ebird %>% filter(year != 2020 & year != 2021)#eliminating 2020, 2021 because the COVID-19
+```
+
+```{r boxplot_1}
+#Produce Boxplots and visually check for outliers. Linea indicates the median and the circle indicates the mean
+ggplot(descrip_analysis) +
+  geom_col(aes(x = year, y = n)) + 
+  ggtitle("") + 
+  theme_bw() + theme(legend.position="none")
+#eliminating 2020, 2021 because the COVID-19
+
+```
+### Spatial Plotting
+
+```{r plotSPATIAL , fig.asp = 1}
+# map
+par(mar = c(0.25, 0.25, 0.25, 0.25))
+# set up plot area
+plot(st_geometry(ebird), col = NA)
+# contextual gis data
+plot(st_geometry(cuba_nac, col = "#dddddd", border = "#888888", lwd = 0.5, add = TRUE))
+# plot(pa, col = "#cccccc", border = NA, add = TRUE)
+plot(st_geometry(cuba_mun, col = "#ffffff", lwd = 0.75, add = TRUE))
+plot(st_geometry(cuba_prov, col = "#ffffff", lwd = 1.5, add = TRUE))
+# ebird observations
+# not observed
+plot(st_geometry(ebird),
+     pch = 19, cex = 0.1, col = alpha("#555555", 0.25),
+     add = TRUE)
+# observed
+plot(filter(ebird, species_ob) %>% st_geometry(),
+     pch = 19, cex = 0.3, col = alpha("#4daf4a", 1),
+     add = TRUE)
+# legend
+legend("bottomright", bty = "n",
+       col = c("#555555", "#4daf4a"),
+       legend = c("eBird checklists", "Bird sightings"),
+       pch = 19)
+box()
+par(new = TRUE, mar = c(0, 0, 3, 0))
+title("Waterfowl eBird Observations\n 2013-2023")
+
+```
+
+### Temporal Plotting
+#### Month {#ebird-explore-month}
+```{r ebird-explore-month, fig.asp = 1}
+# summarize data by day bins
+breaks_month <- 1:12
+labels <- breaks_month[-length(breaks_month)] + diff(breaks_month) / 2
+ebird_month <- ebird %>% st_drop_geometry() %>% 
+  group_by(month_year) %>% 
+  summarise(n_checklists = n(),
+            n_detected = sum(species_ob),
+            det_freq = mean(species_ob))
+
+# histogram
+g_month_hist <- ggplot(ebird_month) +
+  aes(x = month_year, y = n_checklists) +
+  geom_segment(aes(xend = month_year, y = 0, yend = n_checklists),
+               color = "grey50") +
+  geom_col() +
+  scale_x_continuous(breaks = seq(1, 12, by = 1), limits = c(1, 12)) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "Month per year",
+       y = "# checklists",
+       title = "Distribution of observation by month")
+
+# frequency of detection
+g_month_freq <- ggplot(ebird_month %>% filter(n_checklists > 100)) +
+  aes(x = month_year, y = det_freq) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = seq(1, 12, by = 1), limits = c(1, 12)) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Month peryear",
+       y = "% checklists with detections",
+       title = "Detection frequency")
+
+# combine
+grid.arrange(g_month_hist, g_month_freq)
+```
+
+
+###Dividing dataset 80 and 20%
+```{r}
+ebird_split <- ebird %>% st_drop_geometry() %>% 
+  mutate(type = if_else(runif(nrow(.)) <= 0.8, "train", "test"))
+# confirm the proportion in each set is correct
+table(ebird_split$type) / nrow(ebird_split)
+```
+

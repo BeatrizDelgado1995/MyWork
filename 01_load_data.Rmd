@@ -1,0 +1,630 @@
+---
+title: "Introduccion Risk of AIV in Cuba during the last ten years"
+author: "Beatriz Delgqdo Hernandez"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+  markdown:
+    references: "references"
+      location: document
+    prefix: "mydoc"
+---
+# Introduction {#intro}
+
+## Introduction {#intro-intro}
+The last decade has been characterized by changes in the population structure of different ecosystems due to the impact of different factors, including climatic crises and human-related actions (CITA). 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+MATERIALS AND METHODS
+
+
+```{r library}
+library(auk)
+library(rgbif)
+library(dplyr)
+library(sf)
+library(ggplot2)
+library(gridExtra)
+library(lubridate)
+library(readr)
+sf_use_s2(FALSE)
+```
+DESCRIPTION OF STUDY AREA
+```{r cuba layer}
+map_proj <- st_crs(4326)
+
+cuba_nac <- st_read("gadm41_CUB_0.shp") %>% 
+  st_simplify(preserveTopology = FALSE, dTolerance = 0.01) %>% 
+  st_transform(crs = map_proj) 
+cuba_prov <- st_read("gadm41_CUB_1.shp") %>% 
+  st_simplify(preserveTopology = FALSE, dTolerance = 0.01) %>% 
+  st_transform(crs = map_proj) 
+cuba_mun <- st_read("gadm41_CUB_2.shp") %>% 
+  st_simplify(preserveTopology = FALSE, dTolerance = 0.01) %>% 
+  st_transform(crs = map_proj) 
+```
+###DATA DESCRIPTION
+**Migratory birds data collection**
+Waterfowl data was extracted from eBird [eBird Basic Dataset (EBD)](https://ebird.org/science/download-ebird-data-products) website during 2013-2023 period. The data manipulation followed the procedure of [@Strimas-Mackey2023]. the bird counting was divided by migratory season per year
+
+
+```{r function time}
+# resolve namespace conflicts
+select <- dplyr::select
+# function to convert time observation to hours since midnight
+time_to_decimal <- function(x) {
+  x <- hms(x, quiet = TRUE)
+  hour(x) + minute(x) / 60 + second(x) / 3600
+}
+```
+
+####Extacting data from eBird
+```{r ebird}
+# # set ebd path
+auk::auk_set_ebd_path("C:/abundance/BD/eBird_data/", overwrite = TRUE)
+# output files
+data_dir <- "data"
+if (!dir.exists(data_dir)) {
+  dir.create(data_dir)
+}
+# setup data directory
+dir.create("data", showWarnings = FALSE)
+
+
+# auk_set_ebd_path(path="C:/abundance/BD/eBird_data", overwrite = TRUE)
+```
+
+
+```{r loadingdata}
+
+ebd_abahamensis <- auk_ebd(c("ebd_CU_whcpin_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_whcpin_smp_relAug-2023_sampling.txt"))
+ebd_abahamensis <- ebd_abahamensis %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_dbicolor <- auk_ebd(c("ebd_CU_fuwduc_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_fuwduc_smp_relAug-2023_sampling.txt"))
+ebd_dbicolor <- ebd_dbicolor %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_amewig <- auk_ebd(c("ebd_CU_amewig_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_amewig_smp_relAug-2023_sampling.txt"))
+ebd_amewig <- ebd_amewig %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_bbwduc <- auk_ebd(c("ebd_CU_bbwduc_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_bbwduc_smp_relAug-2023_sampling.txt"))
+ebd_bbwduc <- ebd_bbwduc %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_buffle <- auk_ebd(c("ebd_CU_buffle_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_buffle_smp_relAug-2023_sampling.txt"))
+ebd_buffle <- ebd_buffle %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_buwtea <- auk_ebd(c("ebd_CU_buwtea_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_buwtea_smp_relAug-2023_sampling.txt"))
+ebd_buwtea <- ebd_buwtea %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_cintea <- auk_ebd(c("ebd_CU_cintea_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_cintea_smp_relAug-2023_sampling.txt"))
+ebd_cintea <- ebd_cintea %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_comter <- auk_ebd(c("ebd_CU_comter_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_comter_smp_relAug-2023_sampling.txt"))
+ebd_comter <- ebd_comter %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_gadwal <- auk_ebd(c("ebd_CU_gadwal_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_gadwal_smp_relAug-2023_sampling.txt"))
+ebd_gadwal <- ebd_gadwal %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_gnwtea <- auk_ebd(c("ebd_CU_gnwtea_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_gnwtea_smp_relAug-2023_sampling.txt"))
+ebd_gnwtea <- ebd_gnwtea %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_gwfgoo <- auk_ebd(c("ebd_CU_gwfgoo_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_gwfgoo_smp_relAug-2023_sampling.txt"))
+ebd_gwfgoo <- ebd_gwfgoo %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_hergul <- auk_ebd(c("ebd_CU_hergul_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_hergul_smp_relAug-2023_sampling.txt"))
+ebd_hergul <- ebd_hergul %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_hoomer <- auk_ebd(c("ebd_CU_hoomer_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_hoomer_smp_relAug-2023_sampling.txt"))
+ebd_hoomer <- ebd_hoomer %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_lessca <- auk_ebd(c("ebd_CU_lessca_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_lessca_smp_relAug-2023_sampling.txt"))
+checklists <- read_sampling( ebd_lessca$file_sampling)
+observations <- read_ebd(ebd_lessca$file)
+# filter the checklist data
+checklists <-  checklists%>% 
+  filter(all_species_reported,
+         protocol_type %in% c("Stationary", "Traveling"))
+
+# filter the observation data
+observations <- observations %>% 
+  filter(all_species_reported,
+         protocol_type %in% c("Stationary", "Traveling"))
+ids <- intersect(checklists$checklist_id, observations$checklist_id)
+f_sampling_lessca <- filter(checklists, checklist_id %in% ids)
+f_ebd_lessca <- filter(observations, checklist_id %in% ids)
+
+ebd_masduc <- auk_ebd(c("ebd_CU_masduc_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_masduc_smp_relAug-2023_sampling.txt"))
+ebd_masduc <- ebd_masduc %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_musduc <- auk_ebd(c("ebd_CU_musduc_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_musduc_smp_relAug-2023_sampling.txt"))
+ebd_musduc <- ebd_musduc %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_norpin <- auk_ebd(c("ebd_CU_norpin_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_norpin_smp_relAug-2023_sampling.txt"))
+checklists <- read_sampling( ebd_norpin$file_sampling)
+observations <- read_ebd(ebd_norpin$file)
+# filter the checklist data
+checklists <-  checklists%>% 
+  filter(all_species_reported,
+         protocol_type %in% c("Stationary", "Traveling"))
+
+# filter the observation data
+observations <- observations %>% 
+  filter(all_species_reported,
+         protocol_type %in% c("Stationary", "Traveling"))
+ids <- intersect(checklists$checklist_id, observations$checklist_id)
+f_sampling_norpin <- filter(checklists, checklist_id %in% ids)
+f_ebd_norpin<- filter(observations, checklist_id %in% ids)
+
+
+ebd_norsho <- auk_ebd(c("ebd_CU_norsho_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_norsho_smp_relAug-2023_sampling.txt"))
+ebd_norsho <- ebd_norsho %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_rebmer <- auk_ebd(c("ebd_CU_rebmer_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_rebmer_smp_relAug-2023_sampling.txt"))
+ebd_rebmer <- ebd_rebmer %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_redhea <- auk_ebd(c("ebd_CU_redhea_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_redhea_smp_relAug-2023_sampling.txt"))
+ebd_redhea <- ebd_redhea %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_ribgul <- auk_ebd(c("ebd_CU_ribgul_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_ribgul_smp_relAug-2023_sampling.txt"))
+ebd_ribgul <- ebd_ribgul %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_rinduc <- auk_ebd(c("ebd_CU_rinduc_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_rinduc_smp_relAug-2023_sampling.txt"))
+ebd_rinduc <- ebd_rinduc %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_rudduc <- auk_ebd(c("ebd_CU_rudduc_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_rudduc_smp_relAug-2023_sampling.txt"))
+ebd_rudduc <- ebd_rudduc %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_snogoo <- auk_ebd(c("ebd_CU_snogoo_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_snogoo_smp_relAug-2023_sampling.txt"))
+checklists <- read_sampling( ebd_snogoo$file_sampling)
+observations <- read_ebd(ebd_snogoo$file)
+# filter the checklist data
+checklists <-  checklists%>% 
+  filter(all_species_reported,
+         protocol_type %in% c("Stationary", "Traveling"))
+
+# filter the observation data
+observations <- observations %>% 
+  filter(all_species_reported,
+         protocol_type %in% c("Stationary", "Traveling"))
+ids <- intersect(checklists$checklist_id, observations$checklist_id)
+f_sampling_snogoo <- filter(checklists, checklist_id %in% ids)
+f_ebd_snogoo<- filter(observations, checklist_id %in% ids)
+
+
+ebd_wiwduc1 <- auk_ebd(c("ebd_CU_wiwduc1_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_wiwduc1_smp_relAug-2023_sampling.txt"))
+ebd_wiwduc1 <- ebd_wiwduc1 %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+
+ebd_wooduc <- auk_ebd(c("ebd_CU_wooduc_smp_relAug-2023.txt"),
+               file_sampling = c("ebd_CU_wooduc_smp_relAug-2023_sampling.txt"))
+ebd_wooduc <- ebd_wooduc %>% 
+  # restrict to the standard traveling and stationary count protocols
+  auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
+  auk_complete()
+```
+
+```{r ebird-extract-filter}
+# output files
+data_dir <- "data"
+if (!dir.exists(data_dir)) {
+  dir.create(data_dir)
+}
+f_ebd_abahamensis <- file.path(data_dir, "ebd_abahamensis.txt")
+f_sampling_abahamensis <- file.path(data_dir, "ebd_checklists_abahamensis.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_abahamensis)) {
+  auk_filter(ebd_abahamensis, file = f_ebd_abahamensis, file_sampling = f_sampling_abahamensis)
+}
+
+f_ebd_amewig <- file.path(data_dir, "ebd_amewig.txt")
+f_sampling_amewig <- file.path(data_dir, "ebd_checklists_amewig.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_amewig)) {
+  auk_filter(ebd_amewig, file = f_ebd_amewig, file_sampling = f_sampling_amewig)
+}
+
+f_ebd_bbwduc <- file.path(data_dir, "ebd_bbwduc.txt")
+f_sampling_bbwduc <- file.path(data_dir, "ebd_checklists_bbwduc.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_bbwduc)) {
+  auk_filter(ebd_bbwduc, file = f_ebd_bbwduc, file_sampling = f_sampling_bbwduc)
+}
+
+f_ebd_buffle <- file.path(data_dir, "ebd_buffle.txt")
+f_sampling_buffle <- file.path(data_dir, "ebd_checklists_buffle.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_buffle)) {
+  auk_filter(ebd_buffle, file = f_ebd_buffle, file_sampling = f_sampling_buffle)
+}
+
+f_ebd_buwtea <- file.path(data_dir, "ebd_buwtea.txt")
+f_sampling_buwtea <- file.path(data_dir, "ebd_checklists_buwtea.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_buwtea)) {
+  auk_filter(ebd_buwtea, file = f_ebd_buwtea, file_sampling = f_sampling_buwtea)
+}
+
+f_ebd_cintea <- file.path(data_dir, "ebd_cintea.txt")
+f_sampling_cintea <- file.path(data_dir, "ebd_checklists_cintea.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_cintea)) {
+  auk_filter(ebd_cintea, file = f_ebd_cintea, file_sampling = f_sampling_cintea)
+}
+
+f_ebd_comter <- file.path(data_dir, "ebd_comter.txt")
+f_sampling_comter <- file.path(data_dir, "ebd_checklists_comter.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_comter)) {
+  auk_filter(ebd_comter, file = f_ebd_comter, file_sampling = f_sampling_comter)
+}
+
+f_ebd_dbicolor <- file.path(data_dir, "ebd_dbicolor.txt")
+f_sampling_dbicolor <- file.path(data_dir, "ebd_checklists_dbicolor.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_dbicolor)) {
+  auk_filter(ebd_dbicolor, file = f_ebd_dbicolor, file_sampling = f_sampling_dbicolor)
+}
+
+f_ebd_gadwal <- file.path(data_dir, "ebd_gadwal.txt")
+f_sampling_gadwal <- file.path(data_dir, "ebd_checklists_gadwal.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_gadwal)) {
+  auk_filter(ebd_gadwal, file = f_ebd_gadwal, file_sampling = f_sampling_gadwal)
+}
+
+f_ebd_gnwtea <- file.path(data_dir, "ebd_gnwtea.txt")
+f_sampling_gnwtea <- file.path(data_dir, "ebd_checklists_gnwtea.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_gnwtea)) {
+  auk_filter(ebd_gnwtea, file = f_ebd_gnwtea, file_sampling = f_sampling_gnwtea)
+}
+
+f_ebd_gwfgoo <- file.path(data_dir, "ebd_gwfgoo.txt")
+f_sampling_gwfgoo <- file.path(data_dir, "ebd_checklists_gwfgoo.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_gwfgoo)) {
+  auk_filter(ebd_gwfgoo, file = f_ebd_gwfgoo, file_sampling = f_sampling_gwfgoo)
+}
+
+f_ebd_hergul <- file.path(data_dir, "ebd_hergul.txt")
+f_sampling_hergul <- file.path(data_dir, "ebd_checklists_hergul.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_hergul)) {
+  auk_filter(ebd_hergul, file = f_ebd_hergul, file_sampling = f_sampling_hergul)
+}
+
+f_ebd_hoomer <- file.path(data_dir, "ebd_hoomer.txt")
+f_sampling_hoomer <- file.path(data_dir, "ebd_checklists_hoomer.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_hoomer)) {
+  auk_filter(ebd_hoomer, file = f_ebd_hoomer, file_sampling = f_sampling_hoomer)
+}
+
+# f_ebd_lessca <- file.path(data_dir, "ebd_lessca.txt")
+# f_sampling_lessca <- file.path(data_dir, "ebd_checklists_lessca.txt")
+# # only run if the files don't already exist
+# if (!file.exists(f_ebd_lessca)) {
+#   auk_filter(ebd_lessca, file = f_ebd_lessca, file_sampling = f_sampling_lessca)
+# }
+
+f_ebd_masduc <- file.path(data_dir, "ebd_masduc.txt")
+f_sampling_masduc <- file.path(data_dir, "ebd_checklists_masduc.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_masduc)) {
+  auk_filter(ebd_masduc, file = f_ebd_masduc, file_sampling = f_sampling_masduc)
+}
+
+f_ebd_musduc <- file.path(data_dir, "ebd_musduc.txt")
+f_sampling_musduc <- file.path(data_dir, "ebd_checklists_musduc.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_musduc)) {
+  auk_filter(ebd_musduc, file = f_ebd_musduc, file_sampling = f_sampling_musduc)
+}
+
+# f_ebd_norpin <- file.path(data_dir, "ebd_norpin.txt")
+# f_sampling_norpin <- file.path(data_dir, "ebd_checklists_norpin.txt")
+# # only run if the files don't already exist
+# if (!file.exists(f_ebd_norpin)) {
+#   auk_filter(ebd_norpin, file = f_ebd_norpin, file_sampling = f_sampling_norpin)
+# }
+
+f_ebd_norsho <- file.path(data_dir, "ebd_norsho.txt")
+f_sampling_norsho <- file.path(data_dir, "ebd_checklists_norsho.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_norsho)) {
+  auk_filter(ebd_norsho, file = f_ebd_norsho, file_sampling = f_sampling_norsho)
+}
+
+f_ebd_rebmer <- file.path(data_dir, "ebd_rebmer.txt")
+f_sampling_rebmer <- file.path(data_dir, "ebd_checklists_rebmer.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_rebmer)) {
+  auk_filter(ebd_rebmer, file = f_ebd_rebmer, file_sampling = f_sampling_rebmer)
+}
+
+f_ebd_redhea <- file.path(data_dir, "ebd_redhea.txt")
+f_sampling_redhea <- file.path(data_dir, "ebd_checklists_redhea.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_redhea)) {
+  auk_filter(ebd_redhea, file = f_ebd_redhea, file_sampling = f_sampling_redhea)
+}
+
+f_ebd_ribgul <- file.path(data_dir, "ebd_ribgul.txt")
+f_sampling_ribgul <- file.path(data_dir, "ebd_checklists_ribgul.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_ribgul)) {
+  auk_filter(ebd_ribgul, file = f_ebd_ribgul, file_sampling = f_sampling_ribgul)
+}
+
+f_ebd_rinduc <- file.path(data_dir, "ebd_rinduc.txt")
+f_sampling_rinduc <- file.path(data_dir, "ebd_checklists_rinduc.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_rinduc)) {
+  auk_filter(ebd_rinduc, file = f_ebd_rinduc, file_sampling = f_sampling_rinduc)
+}
+
+f_ebd_rudduc <- file.path(data_dir, "ebd_rudduc.txt")
+f_sampling_rudduc <- file.path(data_dir, "ebd_checklists_rudduc.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_rudduc)) {
+  auk_filter(ebd_rudduc, file = f_ebd_rudduc, file_sampling = f_sampling_rudduc)
+}
+
+# f_ebd_snogoo <- file.path(data_dir, "ebd_snogoo.txt")
+# f_sampling_snogoo <- file.path(data_dir, "ebd_checklists_snogoo.txt")
+# # only run if the files don't already exist
+# if (!file.exists(f_ebd_snogoo)) {
+#   auk_filter(ebd_snogoo, file = f_ebd_snogoo, file_sampling = f_sampling_snogoo)
+# }
+
+f_ebd_wiwduc1 <- file.path(data_dir, "ebd_wiwduc1.txt")
+f_sampling_wiwduc1 <- file.path(data_dir, "ebd_checklists_wiwduc1.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_wiwduc1)) {
+  auk_filter(ebd_wiwduc1, file = f_ebd_wiwduc1, file_sampling = f_sampling_wiwduc1)
+}
+
+f_ebd_wooduc <- file.path(data_dir, "ebd_wooduc.txt")
+f_sampling_wooduc <- file.path(data_dir, "ebd_checklists_wooduc.txt")
+# only run if the files don't already exist
+if (!file.exists(f_ebd_wooduc)) {
+  auk_filter(ebd_wooduc, file = f_ebd_wooduc, file_sampling = f_sampling_wooduc)
+}
+
+
+```
+
+
+```{r ebird-zf}
+ebd_zf_ebd_abahamensis <- auk_zerofill(f_ebd_abahamensis, f_sampling_abahamensis, collapse = TRUE)
+ebd_zf_ebd_amewig <- auk_zerofill(f_ebd_amewig, f_sampling_amewig, collapse = TRUE)
+ebd_zf_ebd_bbwduc <- auk_zerofill(f_ebd_bbwduc, f_sampling_bbwduc, collapse = TRUE)
+ebd_zf_ebd_buffle <- auk_zerofill(f_ebd_buffle, f_sampling_buffle, collapse = TRUE)
+ebd_zf_ebd_buwtea <- auk_zerofill(f_ebd_buwtea, f_sampling_buwtea, collapse = TRUE)
+ebd_zf_ebd_cintea <- auk_zerofill(f_ebd_cintea, f_sampling_cintea, collapse = TRUE)
+ebd_zf_ebd_comter <- auk_zerofill(f_ebd_comter, f_sampling_comter, collapse = TRUE)
+ebd_zf_ebd_gadwal <- auk_zerofill(f_ebd_gadwal, f_sampling_gadwal, collapse = TRUE)
+ebd_zf_ebd_dbicolor <- auk_zerofill(f_ebd_dbicolor, f_sampling_dbicolor, collapse = TRUE)
+ebd_zf_ebd_gnwtea <- auk_zerofill(f_ebd_gnwtea, f_sampling_gnwtea, collapse = TRUE)
+ebd_zf_ebd_gwfgoo <- auk_zerofill(f_ebd_gwfgoo, f_sampling_gwfgoo, collapse = TRUE)
+ebd_zf_ebd_hergul <- auk_zerofill(f_ebd_hergul, f_sampling_hergul, collapse = TRUE)
+ebd_zf_ebd_hoomer <- auk_zerofill(f_ebd_hoomer, f_sampling_hoomer, collapse = TRUE)
+ebd_zf_ebd_lessca <- auk_zerofill(f_ebd_lessca, f_sampling_lessca, collapse = TRUE)#zero match
+ebd_zf_ebd_masduc <- auk_zerofill(f_ebd_masduc, f_sampling_masduc, collapse = TRUE)
+ebd_zf_ebd_musduc <- auk_zerofill(f_ebd_musduc, f_sampling_musduc, collapse = TRUE)
+ebd_zf_ebd_norpin <- auk_zerofill(f_ebd_norpin, f_sampling_norpin, collapse = TRUE)#zero match
+ebd_zf_ebd_norsho <- auk_zerofill(f_ebd_norsho, f_sampling_norsho, collapse = TRUE)
+ebd_zf_ebd_rebmer <- auk_zerofill(f_ebd_rebmer, f_sampling_rebmer, collapse = TRUE)
+ebd_zf_ebd_redhea <- auk_zerofill(f_ebd_redhea, f_sampling_redhea, collapse = TRUE)
+ebd_zf_ebd_ribgul <- auk_zerofill(f_ebd_ribgul, f_sampling_ribgul, collapse = TRUE)
+ebd_zf_ebd_rinduc <- auk_zerofill(f_ebd_rinduc, f_sampling_rinduc, collapse = TRUE)
+ebd_zf_ebd_rudduc <- auk_zerofill(f_ebd_rudduc, f_sampling_rudduc, collapse = TRUE)
+ebd_zf_ebd_snogoo <- auk_zerofill(f_ebd_snogoo, f_sampling_snogoo, collapse = TRUE)#zero match
+ebd_zf_ebd_wiwduc1 <- auk_zerofill(f_ebd_wiwduc1, f_sampling_wiwduc1, collapse = TRUE)
+ebd_zf_ebd_wooduc <- auk_zerofill(f_ebd_wooduc, f_sampling_wooduc, collapse = TRUE)
+
+ebd_zf <- bind_rows(ebd_zf_ebd_abahamensis, ebd_zf_ebd_amewig, ebd_zf_ebd_bbwduc, ebd_zf_ebd_buffle, ebd_zf_ebd_buwtea, 
+          ebd_zf_ebd_cintea, ebd_zf_ebd_comter, ebd_zf_ebd_gadwal, ebd_zf_ebd_dbicolor, ebd_zf_ebd_gnwtea,
+          ebd_zf_ebd_gwfgoo, ebd_zf_ebd_hergul, ebd_zf_ebd_hoomer, ebd_zf_ebd_lessca, ebd_zf_ebd_masduc,
+          ebd_zf_ebd_musduc, ebd_zf_ebd_norpin, ebd_zf_ebd_norsho, ebd_zf_ebd_rebmer, ebd_zf_ebd_redhea,
+          ebd_zf_ebd_ribgul, ebd_zf_ebd_rinduc, ebd_zf_ebd_rudduc, ebd_zf_ebd_snogoo, ebd_zf_ebd_wiwduc1, 
+          ebd_zf_ebd_wooduc)
+
+```
+
+
+```{r}
+# clean up variables
+ebd_zf <- ebd_zf %>% 
+  mutate(
+    # convert X to NA
+    observation_count = if_else(observation_count == "X", 
+                                NA_character_, observation_count),
+    observation_count = as.integer(observation_count),
+    # effort_distance_km to 0 for non-travelling counts
+    effort_distance_km = if_else(protocol_type != "Traveling", 
+                                 0, effort_distance_km),
+    # convert time to decimal hours since midnight
+    time_observations_started = time_to_decimal(time_observations_started),
+    # split date into year and day of year
+    year = year(observation_date),
+    day_of_year = yday(observation_date)
+  )
+
+# Accounting for variation in detectability
+# additional filtering
+ebd_zf_filtered <- ebd_zf %>% 
+  filter(
+    # effort filters
+    duration_minutes <= 6 * 60,
+    effort_distance_km <= 10,
+    # last 10 years of data
+    year >= 2013,
+    # 10 or fewer observers
+     number_observers <= 10
+    )%>% mutate(id=paste0(scientific_name, observation_date, longitude, latitude))
+#Searching duplicated
+# unique(ebd_zf_filtered %>% mutate(id=paste0(scientific_name, observation_date, longitude, latitude)))
+```
+
+```{r}
+ebird <- ebd_zf_filtered %>%
+  # tidyr::separate("observation_date", sep="-", into = c("year", "month", "day")) %>% 
+  select(checklist_id, observer_id, sampling_event_identifier, id,
+         scientific_name, iba_code,species_observed,
+         observation_count, state_code, locality_id, locality, latitude, longitude,
+         protocol_type, all_species_reported,
+         observation_date, year, day_of_year, observation_date,
+         time_observations_started, 
+         duration_minutes, effort_distance_km,
+         number_observers) %>% mutate(y=latitude, x=longitude) %>% 
+  st_as_sf(coords = c("x", "y"), crs=st_crs(cuba_mun))
+
+ebird<- st_intersection(ebird, cuba_mun %>% dplyr::select(GID_2), prepared = TRUE)
+
+
+
+plot(st_geometry(cuba_nac))
+plot(st_geometry(ebird), add=TRUE)
+
+
+```
+
+```{r finaldataseteBird}
+
+write_csv(ebird, "ebird_data.csv", na = "")
+
+```
+
+
+#Extacting data from Gbif
+```{r gbif}
+gbif_an_ch <- read.delim("C:/Users/betty/BD/Gbif/0004563-230918134249559/occurrence.txt", header = TRUE, sep = "\t",
+                  fill = TRUE, stringsAsFactors = TRUE) 
+# head(occ)
+gbif_an_ch <- gbif_an_ch[!is.na(gbif_an_ch$decimalLatitude) & !is.na(gbif_an_ch$decimalLongitude),]
+
+gbif_an_ch <- gbif_an_ch %>% select(
+  gbifID, recordedBy, recordedByID, occurrenceID, identificationID, level1Gid, level2Gid, level2Name, occurrenceStatus,
+  eventDate, eventTime, year, month, day, dynamicProperties, locality, municipality, 
+  phylum, kingdom, class, order, family, scientificName, individualCount, lifeStage, sex, habitat, decimalLatitude, 
+  decimalLongitude, verbatimCoordinateSystem, coordinatePrecision
+  ) %>% mutate(
+    # convert NA to 0, assuming zero like absence of data
+    individualCount = if_else(is.na(individualCount), 
+                                0, individualCount),
+    individualCount = as.integer(individualCount),
+    observation_date=lubridate::make_date(year, month, day))
+
+gbif_an_ch <- gbif_an_ch %>% rename(GID_1="level1Gid", GID_2="level2Gid") %>% filter(year>=2013) %>%  
+  mutate(id = paste0(observation_date, scientificName, decimalLongitude,decimalLatitude))
+
+gbif_data <- gbif_an_ch %>%  distinct(id, .keep_all = TRUE)
+```
+# CLEAN THE DATASET! ----
+# mind that data often contain errors, so careful inspection and cleaning are necessary! 
+# here we'll first remove records of absence or zero-abundance (if any):
+```{r}
+names(gbif_data)
+sort(unique(gbif_data$individualCount))  # notice if some points correspond to zero abundance
+sort(unique(gbif_data$occurrenceStatus))  # check for different indications of "absent", which could be in different languages! and remember that R is case-sensitive
+
+write.csv(gbif_data, "gbif_data.csv")
+```
+
+
+
+

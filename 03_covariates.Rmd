@@ -1,0 +1,112 @@
+
+```{r libraries}
+library(sf)
+library(raster)
+library(MODIStsp)
+library(exactextractr)
+library(viridis)
+library(tidyverse)
+library(terra)
+library(geodata)
+library(MODIS)
+library(lubridate)
+sf_use_s2(FALSE)
+```
+
+```{r databycov}
+
+ebird <- read.csv("ebird_data.csv") %>% mutate(observation_date=as.Date(observation_date))
+```
+
+
+```{r}
+# earliest year of ebird data
+begin_year <- format(min(ebird$observation_date), "%Y.01.01")
+# end date for ebird data
+end_year <- format(max(ebird$observation_date), "%Y.12.31")
+# download tiles and combine into a single raster for each year
+tifs <- runGdal(product = "MCD12Q1", collection = "61", SDSstring = "LC_Type1", 
+                extent = cuba_mun %>% st_buffer(dist = 10000), 
+                begin = begin_year, end = end_year, 
+                outDirPath = "data", job = "modis",
+                MODISserverOrder = "LPDAAC", user = "beatriz1995" ,
+         password = "Fr@ncia2023") %>% 
+  pluck("MCD12Q1.061") %>% 
+  unlist()
+```
+
+
+```{r landcover-dl-r, eval = FALSE}
+map_boundary <- st_as_sfc(st_bbox(cuba_mun))
+# Defining filepath to save downloaded spatial file
+spatial_filepath <- "LandCoverData/land_cover_cuba.shp"
+# Saving downloaded spatial file on to our computer
+st_write(map_boundary, paste0(spatial_filepath))
+
+# download tiles and combine into a single raster for each year
+MODIStsp_download(
+  http = "https://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.061/",
+         # out_folder      = 'MODIS/',
+         out_folder_mod  = 'MODIS/',
+         selprod         = 'LandCover_Type_Yearly_500m (MCD12Q1)',
+         bandsel         = 'LC1',
+         sens_sel          = 'terra',
+         user            = "beatriz1995" ,
+         password        = "Fr@ncia2023",
+         download_range = "full",
+         start_date      = "2013.01.01", 
+         end_date        = "2022.12.31", 
+         verbose         = TRUE,
+         bbox            =  map_boundary,
+         spatmeth        = 'bbox',
+         out_format      = 'GTiff',
+         compress        = 'LZW',
+         out_projsel     = 'User Defined',
+         output_proj     = map_proj,
+         delete_hdf      = TRUE,
+         parallel        = TRUE
+         )
+
+MODIStsp(gui = FALSE,
+         selprod         = "LandCover_Type_Yearly_500m (MCD12Q1)",
+         bandsel         = "LC1", 
+         user            = "beatriz1995" ,
+         password        = "Fr@ncia2023",
+         download_range = "full",
+         start_date      = "2013.01.01", 
+         end_date        = "2022.12.31", 
+         bbox = st_bbox(cuba_mun),
+         verbose         = FALSE,
+         spatmeth        = "file",
+         # spafile         = spatial_filepath,
+         out_format      = "GTiff")
+
+# rename tifs to have more descriptive names
+new_names <- format(as.Date(names(tifs)), "%Y") %>% 
+  sprintf("modis_mcd12q1_umd_%s.tif", .) %>% 
+  file.path(dirname(tifs), .)
+file.rename(tifs, new_names)
+```
+
+```{r}
+worldclim <- worldclim_country(country="Cuba", var=c("tmin","tavg", "prec"), path="climate", version="2.1", res=0.5)
+pop_2010<-population(year=2010, res=0.5, path = tempdir())
+pop_2015<-population(year=2015, res=0.5, path = tempdir())
+pop_2020<-population(year=2020, res=0.5, path = tempdir())
+crops <- cropland("GLAD", path=tempdir())
+```
+
+
+```{r cov}
+# The main data source is Shuttle Radar Topography Mission (SRTM) , specifically the hole-filled CGIAR-SRTM (90 m resolution) from https://srtm.csi.cgiar.org/. These data are only available for latitudes between -60 and 60.
+# The 1 km (30 arc seconds) data were aggregated from SRTM 90 m resolution data and supplemented with the GTOP30 data for high latitudes (>60 degrees).
+elv_cub <- elevation_30s(country = "Cuba", mask = TRUE, path="data")
+
+
+# https://data.apps.fao.org/map/catalog/srv/eng/catalog.search#/metadata/9dc31512-a438-4b59-acfd-72830fbd6943
+# The Global Urban-Rural Catchment Areas (URCA) is a raster dataset of the 30 urban–rural continuum categories of catchment areas for cities and towns. Each rural pixel is assigned to one defined travel time category: less than one hour, one to two hours, and two to three hours travel time to one of seven urban agglomeration sizes. The agglomerations range from large cities with i) populations greater than 5 million and ii) between 1 to 5 million; intermediate cities with iii) 500,000 to 1 million and iv) 250,000 to 500,000 inhabitants; small cities with populations v) between 100,000 and 250,000 and vi) between 50,000 and 100,000; and vii) towns of between 20,000 and 50,000 people. The remaining pixels that are more than 3 hours away from any urban agglomeration of at least 20,000 people are considered as either hinterland or dispersed towns being that they are not gravitating around any urban agglomeration.
+accesib <- rast("urban_rural_catchment_areas.tif") %>% 
+  crop(y=cuba_mun)
+plot(accesib)
+```
+
